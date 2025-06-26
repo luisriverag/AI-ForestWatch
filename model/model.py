@@ -13,6 +13,7 @@ import torch.nn as nn
 from base import BaseModel
 from torch.optim import *
 from torchvision import models
+import timm
 
 
 class UNet_down_block(BaseModel):
@@ -188,6 +189,18 @@ class UNet(BaseModel):
         x = self.decoder_1(x1_cat, x)
         x = self.binary_last_conv(x)
         # return the final vector and the corresponding softmax-ed prediction
+        return x, self.softmax(x)
+
+
+class SegFormerB5(BaseModel):
+    def __init__(self, input_channels=18, num_classes=2):
+        super(SegFormerB5, self).__init__()
+        # Load the SegFormer B5 model from timm
+        self.model = timm.create_model('segformer_b5', pretrained=False, num_classes=num_classes, in_chans=input_channels)
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        x = self.model(x)
         return x, self.softmax(x)
 
 

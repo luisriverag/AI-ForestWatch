@@ -66,7 +66,7 @@ def get_images_from_large_file(data_directory_path, label_directory_path, destin
                     band.ReadAsArray(j*stride, i*stride, stride, stride))))
             # save this example/label pair of numpy arrays as a pickle file with an index
             this_example_save_path = os.path.join(
-                destination, '{}_{}_{}.pkl'.format(region, year, count))
+                "Data/train/training_2015_pickled_data", '{}_{}_{}.pkl'.format(region, year, count))
             with open(this_example_save_path, 'wb') as this_pickle:
                 pickle.dump((example_subset, label_subset),
                             file=this_pickle, protocol=pickle.HIGHEST_PROTOCOL)
