@@ -100,16 +100,20 @@ class BaseTrainer:
                                      "Training stops.".format(self.early_stop))
                     break
 
-            if epoch % self.save_period == 0:
-                self._save_checkpoint(epoch, save_best=best)
+            # Save the most recent checkpoint as model_last.pth (overwrites previous)
+            self._save_checkpoint(epoch, save_best=best, is_last=True)
+        
+        # Close TensorBoard writer if it exists
+        if hasattr(self, 'close_tensorboard'):
+            self.close_tensorboard()
 
-    def _save_checkpoint(self, epoch, save_best=False):
+    def _save_checkpoint(self, epoch, save_best=False, is_last=False):
         """
         Saving checkpoints
 
         :param epoch: current epoch number
-        :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
+        :param is_last: if True, save as 'model_last_epoch{}.pth' and clean up old last checkpoints
         """
         arch = type(self.model).__name__
         state = {
@@ -120,9 +124,27 @@ class BaseTrainer:
             'monitor_best': self.mnt_best,
             'config': self.config
         }
-        filename = str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(epoch))
-        torch.save(state, filename)
-        self.logger.info("Saving checkpoint: {} ...".format(filename))
+        
+        if is_last:
+            # Clean up old model_last_epoch*.pth files
+            import glob
+            import os
+            old_last_files = glob.glob(str(self.checkpoint_dir / 'model_last_epoch*.pth'))
+            for old_file in old_last_files:
+                try:
+                    os.remove(old_file)
+                except OSError:
+                    pass
+            
+            # Save new last checkpoint with epoch number
+            filename = str(self.checkpoint_dir / 'model_last_epoch{}.pth'.format(epoch))
+            torch.save(state, filename)
+            self.logger.info("Saving last checkpoint: {} ...".format(filename))
+        else:
+            filename = str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(epoch))
+            torch.save(state, filename)
+            self.logger.info("Saving checkpoint: {} ...".format(filename))
+            
         if save_best:
             best_path = str(self.checkpoint_dir / 'model_best.pth')
             torch.save(state, best_path)
