@@ -6,3 +6,5 @@ torchsummary
 torchviz
 imgaug
 timm
+tqdm
+tensorboard

@@ -19,7 +19,7 @@ class Landsat8TrainDataLoader(BaseDataLoader):
     """
 
     def __init__(self, data_dir, data_split_lists_path, batch_size, model_input_size, bands, num_classes, one_hot,
-                 train_split=0.8, mode='train', num_workers=4):
+                 train_split=0.8, mode='train', num_workers=0):
 
         assert mode in (
             'train', 'val', 'test'), "Invalid value for train/val/test mode"
@@ -72,7 +72,7 @@ class Landsat8InferenceDataLoader(BaseDataLoader):
 
     def __init__(self, image_path, district,
                  rasterized_shapefiles_path, bands, model_input_size, num_classes, batch_size,
-                 num_workers=2, transforms=None):
+                 num_workers=0, transforms=None):
         # create dataset class instances
         self.dataset = BaseInferenceDataset(rasterized_shapefiles_path=rasterized_shapefiles_path,
                                             image_path=image_path,

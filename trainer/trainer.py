@@ -10,6 +10,9 @@ from base import BaseTrainer
 from torch.nn.utils import clip_grad_norm_
 from utils import MetricTracker, inf_loop
 from sklearn.metrics import classification_report
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
+import os
 
 
 class Trainer(BaseTrainer):
@@ -42,6 +45,9 @@ class Trainer(BaseTrainer):
             'loss', *[m.__name__ for m in self.metric_ftns])
         self.valid_metrics = MetricTracker(
             'loss', *[m.__name__ for m in self.metric_ftns])
+        
+        # Initialize TensorBoard writer
+        self.tb_writer = SummaryWriter(log_dir=os.path.join(config.models_dir, 'tensorboard_logs'))
 
     def _train_epoch(self, epoch):
         """
@@ -52,7 +58,13 @@ class Trainer(BaseTrainer):
         """
         self.model.train()
         self.train_metrics.reset()
-        for batch_idx, (data, target) in enumerate(self.data_loader):
+        
+        # Create progress bar for training
+        pbar = tqdm(self.data_loader, desc=f'Training Epoch {epoch}', 
+                   leave=False, ncols=100, unit='batch', 
+                   disable=False, dynamic_ncols=True)
+        
+        for batch_idx, (data, target) in enumerate(pbar):
             data, target = data.to(self.device), target.to(self.device)
 
             self.optimizer.zero_grad()
@@ -71,14 +83,20 @@ class Trainer(BaseTrainer):
                 self.train_metrics.update(
                     met.__name__, met(softmaxed, loss_target))
 
-            if batch_idx % self.log_step == 0:
-                self.logger.debug('Train Epoch: {} {} Loss: {:.6f}'.format(
-                    epoch,
-                    self._progress(batch_idx),
-                    loss.item()))
+            # Update progress bar with current loss
+            pbar.set_postfix({'Loss': f'{loss.item():.6f}'})
+
+            # Disable the original progress logging since we have tqdm
+            # if batch_idx % self.log_step == 0:
+            #     self.logger.debug('Train Epoch: {} {} Loss: {:.6f}'.format(
+            #         epoch,
+            #         self._progress(batch_idx),
+            #         loss.item()))
 
             if batch_idx == self.len_epoch:
                 break
+        
+        pbar.close()
         log = self.train_metrics.result()
 
         if self.do_validation:
@@ -90,6 +108,9 @@ class Trainer(BaseTrainer):
             self.logger.info("Testing current best: model_best.pth ...")
             test_log = self._valid_epoch(self.test_data_loader)
             log.update(**{'test_'+k: v for k, v in test_log.items()})
+
+        # Log metrics to TensorBoard
+        self._log_to_tensorboard(log, epoch)
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
@@ -106,8 +127,13 @@ class Trainer(BaseTrainer):
 
         self.model.eval()
         self.valid_metrics.reset()
+        
+        # Create progress bar for validation
+        pbar = tqdm(data_loader, desc='Validation', leave=False, ncols=100, unit='batch', 
+                   dynamic_ncols=True)
+        
         with torch.no_grad():
-            for batch_idx, (data, target) in enumerate(data_loader):
+            for batch_idx, (data, target) in enumerate(pbar):
                 data, target = data.to(self.device), target.to(self.device)
 
                 out_x, softmaxed = self.model(data)
@@ -122,14 +148,41 @@ class Trainer(BaseTrainer):
                     self.valid_metrics.update(
                         met.__name__, met(softmaxed, loss_target))
 
+                # Update progress bar with current loss
+                pbar.set_postfix({'Loss': f'{loss.item():.6f}'})
+
                 label_valid_indices = (target.view(-1) != 0)
                 valid_pred = pred.view(-1)[label_valid_indices]
                 valid_label = target.view(-1)[label_valid_indices] - 1
                 preds = np.concatenate((preds, valid_pred.view(-1).cpu()), axis=0)
                 targets = np.concatenate((targets, valid_label.view(-1).cpu()), axis=0)
+        
+        pbar.close()
         log = self.valid_metrics.result()
         log['classification_report'] = "\n" + classification_report(targets, preds, target_names=('Non-Forest', 'Forest'))
         return log
+
+    def _log_to_tensorboard(self, log, epoch):
+        """
+        Log metrics to TensorBoard
+        
+        :param log: Dictionary containing metrics to log
+        :param epoch: Current epoch number
+        """
+        for key, value in log.items():
+            if isinstance(value, (int, float)) and key != 'epoch':
+                self.tb_writer.add_scalar(key, value, epoch)
+        
+        # Log learning rate if available
+        if self.lr_scheduler is not None:
+            self.tb_writer.add_scalar('learning_rate', 
+                                    self.lr_scheduler.get_last_lr()[0], epoch)
+    
+    def close_tensorboard(self):
+        """
+        Close TensorBoard writer
+        """
+        self.tb_writer.close()
 
     def _progress(self, batch_idx):
         base = '[{}/{} ({:.0f}%)]'

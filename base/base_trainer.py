@@ -102,6 +102,10 @@ class BaseTrainer:
 
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=best)
+        
+        # Close TensorBoard writer if it exists
+        if hasattr(self, 'close_tensorboard'):
+            self.close_tensorboard()
 
     def _save_checkpoint(self, epoch, save_best=False):
         """
