@@ -57,7 +57,7 @@
         "pretrained_model": "Data/PretrainedModel/model_69_topologyENC_4_DEC_4_lr1e-06_bands18.pt",
         "save_period": 1,
         "verbosity": 2,
-        "monitor": "off",
+        "monitor": "min val_loss",
         "early_stop": 0,
         "tensorboard": false,
         "mode": "train"

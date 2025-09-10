@@ -184,6 +184,87 @@ class Trainer(BaseTrainer):
         """
         self.tb_writer.close()
 
+    def _save_checkpoint(self, epoch, save_best=False, is_last=False):
+        """
+        Saving checkpoints with lr_scheduler state
+
+        :param epoch: current epoch number
+        :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
+        :param is_last: if True, save as 'model_last_epoch{}.pth' and clean up old last checkpoints
+        """
+        arch = type(self.model).__name__
+        state = {
+            'arch': arch,
+            'epoch': epoch,
+            'state_dict': self.model.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
+            'monitor_best': self.mnt_best,
+            'config': self.config
+        }
+        
+        # Add lr_scheduler state if available
+        if self.lr_scheduler is not None:
+            state['lr_scheduler'] = self.lr_scheduler.state_dict()
+        
+        if is_last:
+            # Clean up old model_last_epoch*.pth files
+            import glob
+            import os
+            old_last_files = glob.glob(str(self.checkpoint_dir / 'model_last_epoch*.pth'))
+            for old_file in old_last_files:
+                try:
+                    os.remove(old_file)
+                except OSError:
+                    pass
+            
+            # Save new last checkpoint with epoch number
+            filename = str(self.checkpoint_dir / 'model_last_epoch{}.pth'.format(epoch))
+            torch.save(state, filename)
+            self.logger.info("Saving last checkpoint: {} ...".format(filename))
+        else:
+            filename = str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(epoch))
+            torch.save(state, filename)
+            self.logger.info("Saving checkpoint: {} ...".format(filename))
+            
+        if save_best:
+            best_path = str(self.checkpoint_dir / 'model_best.pth')
+            torch.save(state, best_path)
+            self.logger.info("Saving current best: model_best.pth ...")
+
+    def _resume_checkpoint(self, resume_path):
+        """
+        Resume from saved checkpoints with lr_scheduler state
+
+        :param resume_path: Checkpoint path to be resumed
+        """
+        resume_path = str(resume_path)
+        self.logger.info("Loading checkpoint: {} ...".format(resume_path))
+        checkpoint = torch.load(resume_path)
+        if not 'epoch' in checkpoint:
+            self.model.load_state_dict(torch.load(resume_path), strict=False)
+        else:
+            self.start_epoch = checkpoint['epoch'] + 1
+            self.mnt_best = checkpoint['monitor_best']
+            # load architecture params from checkpoint.
+            if checkpoint['config']['arch'] != self.config['arch']:
+                self.logger.warning("Warning: Architecture configuration given in config file is different from that of "
+                                    "checkpoint. This may yield an exception while state_dict is being loaded.")
+            self.model.load_state_dict(checkpoint['state_dict'])
+
+            # load optimizer state from checkpoint only when optimizer type is not changed.
+            if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
+                self.logger.warning("Warning: Optimizer type given in config file is different from that of checkpoint. "
+                                    "Optimizer parameters not being resumed.")
+            else:
+                self.optimizer.load_state_dict(checkpoint['optimizer'])
+
+            # load lr_scheduler state from checkpoint if available
+            if 'lr_scheduler' in checkpoint and self.lr_scheduler is not None:
+                self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+                self.logger.info("Learning rate scheduler state loaded from checkpoint.")
+
+        self.logger.info("Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch))
+
     def _progress(self, batch_idx):
         base = '[{}/{} ({:.0f}%)]'
         if hasattr(self.data_loader, 'n_samples'):
