@@ -32,12 +32,13 @@ class ConfigParser:
         save_dir = Path(self.config['trainer']['save_dir'])
 
         exper_name = self.config['name']
+        model_type = self.config['arch']['type']
         if run_id is None: # use timestamp as default run-id
             run_id = datetime.now().strftime(r'%m%d_%H%M%S')
-        self._models_dir = save_dir / 'models' / exper_name / run_id
-        self._log_dir = save_dir / 'log' / exper_name / run_id
-        self._error_maps_dir = save_dir / 'error_maps' / exper_name / run_id
-        self._inference_dir = save_dir / 'destination' / exper_name / run_id
+        self._models_dir = save_dir / 'models' / exper_name / model_type / run_id
+        self._log_dir = save_dir / 'log' / exper_name / model_type / run_id
+        self._error_maps_dir = save_dir / 'error_maps' / exper_name / model_type / run_id
+        self._inference_dir = save_dir / 'destination' / exper_name / model_type / run_id
 
         # make directory for saving checkpoints, log, and error maps.
         exist_ok = run_id == ''
