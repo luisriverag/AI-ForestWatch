@@ -14,10 +14,10 @@ def _make_se(c, reduction=16):
 
 class UNetSE_down_block(BaseModel):
     """
-        Encoder block + SE
+        Encoder block + optional SE
     """
 
-    def __init__(self, input_channel, output_channel, conv_1=None, conv_2=None, se_reduction=16):
+    def __init__(self, input_channel, output_channel, conv_1=None, conv_2=None, se_reduction=16, use_se=True):
         super(UNetSE_down_block, self).__init__()
         if conv_1:
             print('LOG: Using pretrained convolutional layer', conv_1)
@@ -35,21 +35,24 @@ class UNetSE_down_block(BaseModel):
         self.activate = nn.ReLU(inplace=True)
 
         # NEW: SE after the block has produced output_channel features
-        self.se = _make_se(output_channel, se_reduction)
+        self.use_se = use_se
+        self.se = _make_se(output_channel, se_reduction) if use_se else None
 
     def forward(self, x):
         x = self.activate(self.bn1(self.conv1(x)))
         x = self.activate(self.bn2(self.conv2(x)))
-        x = self.se(x)  # channel recalibration
+        # NEW: SE after the block has produced output_channel features
+        if self.use_se:
+            x = self.se(x)
         return x
 
 
 class UNetSE_up_block(BaseModel):
     """
-        Decoder block + SE
+        Decoder block + optional SE
     """
 
-    def __init__(self, prev_channel, input_channel, output_channel, se_reduction=16):
+    def __init__(self, prev_channel, input_channel, output_channel, se_reduction=16, use_se=True):
         super(UNetSE_up_block, self).__init__()
         self.output_channels = output_channel
         self.tr_conv_1 = nn.ConvTranspose2d(
@@ -63,7 +66,8 @@ class UNetSE_up_block(BaseModel):
         self.activate = nn.ReLU(inplace=True)
 
         # NEW: SE after the two convs in the decoder block
-        self.se = _make_se(output_channel, se_reduction)
+        self.use_se = use_se
+        self.se = _make_se(output_channel, se_reduction) if use_se else None
 
     def forward(self, prev_feature_map, x):
         x = self.tr_conv_1(x)
@@ -71,13 +75,26 @@ class UNetSE_up_block(BaseModel):
         x = torch.cat((x, prev_feature_map), dim=1)
         x = self.activate(self.bn1(self.conv_1(x)))
         x = self.activate(self.bn2(self.conv_2(x)))
-        x = self.se(x)  # channel recalibration
+        # NEW: SE after the two convs in the decoder block
+        if self.use_se:
+            x = self.se(x)
         return x
 
 
 class UNetSE(BaseModel):
-    def __init__(self, topology, input_channels, num_classes, se_reduction=16, se_on_input=True):
+    def __init__(self, topology, input_channels, num_classes, se_reduction=16, se_flags=None):
         super(UNetSE, self).__init__()
+
+        # NEW: SE flags
+        if se_flags is None:
+            se_flags = {
+                "input": True,
+                "encoder": True,
+                "decoder": True,
+                "bottleneck": False  # not used in your code yet
+            }
+        self.se_flags = se_flags
+
         # these topologies are possible right now
         self.topologies = {
             "ENC_1_DEC_1": self.ENC_1_DEC_1,
@@ -93,16 +110,27 @@ class UNetSE(BaseModel):
         self.dropout = nn.Dropout2d(0.6)
         self.activate = nn.ReLU(inplace=True)
 
-        # NEW (optional): SE right on the raw input (18 channels) to weight bands early
-        self.se_input = _make_se(input_channels, max(2, input_channels // 2)) if se_on_input else None
+        # NEW: SE on input
+        self.se_input = _make_se(input_channels, max(2, input_channels // 2)) if self.se_flags["input"] else None
 
-        # Encoders with SE inside the blocks
-        self.encoder_1 = UNetSE_down_block(input_channels, 64, se_reduction=se_reduction)
-        self.encoder_2 = UNetSE_down_block(64, 128, conv_1=pretrained_layers[3], se_reduction=se_reduction)
-        self.encoder_3 = UNetSE_down_block(
-            128, 256, conv_1=pretrained_layers[6], conv_2=pretrained_layers[8], se_reduction=se_reduction)
-        self.encoder_4 = UNetSE_down_block(
-            256, 512, conv_1=pretrained_layers[11], conv_2=pretrained_layers[13], se_reduction=se_reduction)
+        # Encoders with SE
+        self.encoder_1 = UNetSE_down_block(input_channels, 64,
+                                           se_reduction=se_reduction,
+                                           use_se=self.se_flags["encoder"])
+        self.encoder_2 = UNetSE_down_block(64, 128,
+                                           conv_1=pretrained_layers[3],
+                                           se_reduction=se_reduction,
+                                           use_se=self.se_flags["encoder"])
+        self.encoder_3 = UNetSE_down_block(128, 256,
+                                           conv_1=pretrained_layers[6],
+                                           conv_2=pretrained_layers[8],
+                                           se_reduction=se_reduction,
+                                           use_se=self.se_flags["encoder"])
+        self.encoder_4 = UNetSE_down_block(256, 512,
+                                           conv_1=pretrained_layers[11],
+                                           conv_2=pretrained_layers[13],
+                                           se_reduction=se_reduction,
+                                           use_se=self.se_flags["encoder"])
 
         self.mid_conv_64_64_a = nn.Conv2d(64, 64, 3, padding=1)
         self.mid_conv_64_64_b = nn.Conv2d(64, 64, 3, padding=1)
@@ -113,19 +141,27 @@ class UNetSE(BaseModel):
         self.mid_conv_512_1024 = nn.Conv2d(512, 1024, 3, padding=1)
         self.mid_conv_1024_1024 = nn.Conv2d(1024, 1024, 3, padding=1)
 
-        # Decoders with SE inside the blocks
+        # Decoders with SE
         self.decoder_4 = UNetSE_up_block(prev_channel=self.encoder_4.output_channels,
-                                       input_channel=self.mid_conv_1024_1024.out_channels,
-                                       output_channel=256, se_reduction=se_reduction)
+                                         input_channel=self.mid_conv_1024_1024.out_channels,
+                                         output_channel=256,
+                                         se_reduction=se_reduction,
+                                         use_se=self.se_flags["decoder"])
         self.decoder_3 = UNetSE_up_block(prev_channel=self.encoder_3.output_channels,
-                                       input_channel=self.decoder_4.output_channels,
-                                       output_channel=128, se_reduction=se_reduction)
+                                         input_channel=self.decoder_4.output_channels,
+                                         output_channel=128,
+                                         se_reduction=se_reduction,
+                                         use_se=self.se_flags["decoder"])
         self.decoder_2 = UNetSE_up_block(prev_channel=self.encoder_2.output_channels,
-                                       input_channel=self.decoder_3.output_channels,
-                                       output_channel=64, se_reduction=se_reduction)
+                                         input_channel=self.decoder_3.output_channels,
+                                         output_channel=64,
+                                         se_reduction=se_reduction,
+                                         use_se=self.se_flags["decoder"])
         self.decoder_1 = UNetSE_up_block(prev_channel=self.encoder_1.output_channels,
-                                       input_channel=self.decoder_2.output_channels,
-                                       output_channel=64, se_reduction=se_reduction)
+                                         input_channel=self.decoder_2.output_channels,
+                                         output_channel=64,
+                                         se_reduction=se_reduction,
+                                         use_se=self.se_flags["decoder"])
 
         self.binary_last_conv = nn.Conv2d(64, num_classes, kernel_size=1)
         self.softmax = nn.Softmax(dim=1)
