@@ -63,9 +63,31 @@ class MetricTracker:
     def update(self, key, value, n=1):
         if self.writer is not None:
             self.writer.add_scalar(key, value)
-        self._data.total[key] += value * n
+        
+        # Handle list values (like IoU per class)
+        if isinstance(value, list):
+            # Initialize as list if not already
+            if key not in self._data.total or not isinstance(self._data.total[key], list):
+                self._data.total[key] = [0.0] * len(value)
+            for i, v in enumerate(value):
+                self._data.total[key][i] += v * n
+        else:
+            # Initialize as scalar if not already
+            if key not in self._data.total:
+                self._data.total[key] = 0.0
+            self._data.total[key] += value * n
+            
         self._data.counts[key] += n
-        self._data.average[key] = self._data.total[key] / self._data.counts[key]
+        
+        # Calculate average based on value type
+        if isinstance(value, list):
+            # Initialize as list if not already
+            if key not in self._data.average or not isinstance(self._data.average[key], list):
+                self._data.average[key] = [0.0] * len(value)
+            for i in range(len(value)):
+                self._data.average[key][i] = self._data.total[key][i] / self._data.counts[key]
+        else:
+            self._data.average[key] = self._data.total[key] / self._data.counts[key]
 
     def avg(self, key):
         return self._data.average[key]

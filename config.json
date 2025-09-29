@@ -43,7 +43,11 @@
     },
     "loss": "focal_loss2d",
     "metrics": [
-        "accuracy"
+        "accuracy",
+        "f1_score",
+        "precision",
+        "recall",
+        "compute_iou"
     ],
     "lr_scheduler": {
         "type": "ExponentialLR",
