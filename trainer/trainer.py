@@ -80,8 +80,13 @@ class Trainer(BaseTrainer):
 
             self.train_metrics.update('loss', loss.item())
             for met in self.metric_ftns:
-                self.train_metrics.update(
-                    met.__name__, met(softmaxed, loss_target))
+                if met.__name__ == 'compute_iou':
+                    # For IoU, we need to pass the prediction and target directly
+                    ious = met(pred, loss_target)
+                    self.train_metrics.update(met.__name__, ious)
+                else:
+                    self.train_metrics.update(
+                        met.__name__, met(softmaxed, loss_target))
 
             # Update progress bar with current loss
             pbar.set_postfix({'Loss': f'{loss.item():.6f}'})
@@ -145,8 +150,13 @@ class Trainer(BaseTrainer):
 
                 self.valid_metrics.update('loss', loss.item())
                 for met in self.metric_ftns:
-                    self.valid_metrics.update(
-                        met.__name__, met(softmaxed, loss_target))
+                    if met.__name__ == 'compute_iou':
+                        # For IoU, we need to pass the prediction and target directly
+                        ious = met(pred, loss_target)
+                        self.valid_metrics.update(met.__name__, ious)
+                    else:
+                        self.valid_metrics.update(
+                            met.__name__, met(softmaxed, loss_target))
 
                 # Update progress bar with current loss
                 pbar.set_postfix({'Loss': f'{loss.item():.6f}'})
@@ -177,6 +187,29 @@ class Trainer(BaseTrainer):
         if self.lr_scheduler is not None:
             self.tb_writer.add_scalar('learning_rate', 
                                     self.lr_scheduler.get_last_lr()[0], epoch)
+        
+        # Log IoU metrics if available (for both train and val)
+        if 'compute_iou' in log:
+            ious = log['compute_iou']
+            if isinstance(ious, list) and len(ious) >= 2:
+                self.tb_writer.add_scalar('IoU/Train_Class_0', ious[0], epoch)
+                self.tb_writer.add_scalar('IoU/Train_Class_1', ious[1], epoch)
+                self.tb_writer.add_scalar('IoU/Train_Mean', sum(ious) / len(ious), epoch)
+        
+        if 'val_compute_iou' in log:
+            val_ious = log['val_compute_iou']
+            if isinstance(val_ious, list) and len(val_ious) >= 2:
+                self.tb_writer.add_scalar('IoU/Val_Class_0', val_ious[0], epoch)
+                self.tb_writer.add_scalar('IoU/Val_Class_1', val_ious[1], epoch)
+                self.tb_writer.add_scalar('IoU/Val_Mean', sum(val_ious) / len(val_ious), epoch)
+        
+        # Log additional metrics with train/val prefixes for clarity
+        metric_names = ['f1_score', 'precision', 'recall', 'accuracy']
+        for metric in metric_names:
+            if metric in log:
+                self.tb_writer.add_scalar(f'{metric.title()}/Train', log[metric], epoch)
+            if f'val_{metric}' in log:
+                self.tb_writer.add_scalar(f'{metric.title()}/Val', log[f'val_{metric}'], epoch)
     
     def close_tensorboard(self):
         """
