@@ -1,10 +1,20 @@
 import torch
 import torch.nn as nn
-from base import BaseModel
 from torch.optim import *
 from torchvision import models
 from torchvision.ops import SqueezeExcitation  # NEW
 import timm
+
+try:
+    from base.base_model import BaseModel
+except ImportError:
+    try:
+        from base import BaseModel
+    except ImportError:
+        # Fallback: define BaseModel as nn.Module if not found
+        class BaseModel(nn.Module):
+            def __init__(self):
+                super(BaseModel, self).__init__()
 
 
 def _make_se(c, reduction=16):
@@ -107,7 +117,7 @@ class UNetSE(BaseModel):
         pretrained_layers = list(vgg_trained.features)
 
         self.max_pool = nn.MaxPool2d(2, 2)
-        self.dropout = nn.Dropout2d(0.6)
+        self.dropout = nn.Dropout2d(0.5)
         self.activate = nn.ReLU(inplace=True)
 
         # NEW: SE on input
@@ -256,3 +266,130 @@ class UNetSE(BaseModel):
         x = self.decoder_1(x1_cat, x)
         x = self.binary_last_conv(x)
         return x, self.softmax(x)
+
+class UNetSE_resnet(BaseModel):
+    def __init__(self, num_classes, input_channels=3, se_reduction=16, se_flags=None):
+        super().__init__()
+
+        if se_flags is None:
+            se_flags = {"input": True, "encoder": True, "decoder": True, "bottleneck": False}
+        self.se_flags = se_flags
+
+        # # ImageNet pretrained ResNet50 backbone
+        # resnet = models.resnet50(pretrained=True)
+
+        # Pretrained ResNet50 backbone
+        resnet = models.resnet50(weights=None)
+
+        checkpoint = torch.load("Data/PretrainedModel/B13_rn50_moco_0099_ckpt.pth", map_location="cpu")
+        state_dict = checkpoint["state_dict"]
+
+        # strip possible prefixes like "module.encoder_q."
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            if k.startswith("module.encoder_q."):
+                k = k.replace("module.encoder_q.", "")
+            if k.startswith("encoder."):
+                k = k.replace("encoder.", "")
+            new_state_dict[k] = v
+
+        # Create the new first layer for 18 channels (don't load pretrained weights for this)
+        self.layer0_conv = nn.Conv2d(input_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # Initialize with Xavier/He initialization
+        nn.init.xavier_uniform_(self.layer0_conv.weight)
+
+        # Load pretrained weights for the rest of ResNet (skip conv1)
+        pretrained_dict = {k: v for k, v in new_state_dict.items() if k != 'conv1.weight' and k != 'conv1.bias'}
+        resnet.load_state_dict(pretrained_dict, strict=False)
+
+        # Use the pretrained batch norm and activation from the checkpoint
+        self.layer0_bn = resnet.bn1
+        self.layer0_relu = resnet.relu
+
+        self.maxpool = resnet.maxpool
+        self.layer1 = resnet.layer1  # 256 channels
+        self.layer2 = resnet.layer2  # 512 channels
+        self.layer3 = resnet.layer3  # 1024 channels
+        self.layer4 = resnet.layer4  # 2048 channels
+
+        # Freeze all encoder layers except layer0
+        for param in self.layer1.parameters():
+            param.requires_grad = False
+        for param in self.layer2.parameters():
+            param.requires_grad = False
+        for param in self.layer3.parameters():
+            param.requires_grad = False
+        for param in self.layer4.parameters():
+            param.requires_grad = False
+        # self.layer0 is left trainable (default)
+
+        # Optional SE on input
+        self.se_input = _make_se(input_channels, max(2, input_channels // 2)) if self.se_flags["input"] else None
+
+        # Decoder path
+        self.decoder4 = UNetSE_up_block(prev_channel=1024, input_channel=2048,
+                                        output_channel=512, se_reduction=se_reduction,
+                                        use_se=self.se_flags["decoder"])
+        self.decoder3 = UNetSE_up_block(prev_channel=512, input_channel=512,
+                                        output_channel=256, se_reduction=se_reduction,
+                                        use_se=self.se_flags["decoder"])
+        self.decoder2 = UNetSE_up_block(prev_channel=256, input_channel=256,
+                                        output_channel=128, se_reduction=se_reduction,
+                                        use_se=self.se_flags["decoder"])
+        self.decoder1 = UNetSE_up_block(prev_channel=64, input_channel=128,
+                                        output_channel=64, se_reduction=se_reduction,
+                                        use_se=self.se_flags["decoder"])
+                                        
+        self.decoder0 = nn.Sequential(
+            nn.ConvTranspose2d(64, 64, kernel_size=2, stride=2),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True)
+        )
+
+
+        self.final_conv = nn.Conv2d(64, num_classes, kernel_size=1)
+        self.softmax = nn.Softmax(dim=1)
+
+    def _maybe_se_input(self, x_in):
+        return self.se_input(x_in) if self.se_input else x_in
+
+    def forward(self, x):
+        x_in = self._maybe_se_input(x)
+
+        # Encoder (ResNet stages)
+        # x0 = self.layer0(x_in)             # 64
+        x0 = self.layer0_relu(self.layer0_bn(self.layer0_conv(x_in)))
+        x1 = self.layer1(self.maxpool(x0)) # 256
+        x2 = self.layer2(x1)               # 512
+        x3 = self.layer3(x2)               # 1024
+        x4 = self.layer4(x3)               # 2048
+
+        # Decoder path with skip connections
+        x = self.decoder4(x3, x4)
+        x = self.decoder3(x2, x)
+        x = self.decoder2(x1, x)
+        x = self.decoder1(x0, x)
+        x = self.decoder0(x)
+
+        x = self.final_conv(x)
+        return x, self.softmax(x)
+
+
+
+if __name__ == "__main__":
+
+    print("\n" + "#" * 100)
+    print("Testing UNetSE_resnet architecture")
+    print("#" * 100 + "\n")
+
+    # Instantiate your UNetSE_resnet
+    model = UNetSE_resnet(num_classes=2, input_channels=3)
+    print(model)
+
+    # Quick forward pass test with dummy input
+    x = torch.randn(1, 3, 128, 128)   # batch=1, RGB image, 224x224
+    y, y_soft = model(x)
+    print("\nOutput tensor shape (logits):", y.shape)
+    print("Output tensor shape (softmax):", y_soft.shape)
