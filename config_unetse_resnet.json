@@ -1,21 +1,17 @@
 {
-    "name": "Landsat8_UNet",
+    "name": "Landsat8_UNetSE_ResNet",
     "n_gpu": 1,
 
-    "hyperparameter_tuning": {
-        "enabled": true
-    },
     "arch": {
-        "type": "UNet3PlusSE",
+        "type": "UNetSEResnet",
         "args": {
             "input_channels": 18,
             "num_classes": 2,
             "se_reduction": 16,
             "se_flags": {
-                "input": false,
+                "input": true,
                 "encoder": true,
-                "fusion": false,
-                "decoder": false,
+                "decoder": true,
                 "bottleneck": false
             }
         }
@@ -45,10 +41,10 @@
         }
     },
     "optimizer": {
-        "type": "AdamW",
+        "type": "RMSprop",
         "args":{
-            "lr": 0.0003,
-            "weight_decay": 0.0001
+            "lr": 1e-6,
+            "weight_decay": 0
         }
     },
     "loss": "focal_loss2d",
@@ -56,16 +52,14 @@
         "accuracy"
     ],
     "lr_scheduler": {
-        "type": "CosineAnnealingLR",
+        "type": "ExponentialLR",
         "args": {
-            "T_max": 60,
-            "eta_min": 1e-6
+            "gamma": 0.89125
         }
     },
     "trainer": {
-        "epochs": 50,
+        "epochs": 20,
         "save_dir": "saved/",
-        "pretrained_model": "Data/PretrainedModel/model_69_topologyENC_4_DEC_4_lr1e-06_bands18.pt",
         "save_period": 1,
         "verbosity": 2,
         "monitor": "min val_loss",

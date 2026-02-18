@@ -172,6 +172,14 @@ class Trainer(BaseTrainer):
         for key, value in log.items():
             if isinstance(value, (int, float)) and key != 'epoch':
                 self.tb_writer.add_scalar(key, value, epoch)
+
+        # Text logs
+        if "classification_report" in log:
+            self.tb_writer.add_text(
+                "classification_report",
+                f"Epoch {epoch}\n```\n{log['classification_report']}\n```",
+                epoch
+            )
         
         # Log learning rate if available
         if self.lr_scheduler is not None:
@@ -239,9 +247,9 @@ class Trainer(BaseTrainer):
         """
         resume_path = str(resume_path)
         self.logger.info("Loading checkpoint: {} ...".format(resume_path))
-        checkpoint = torch.load(resume_path)
+        checkpoint = torch.load(resume_path, weights_only=False)
         if not 'epoch' in checkpoint:
-            self.model.load_state_dict(torch.load(resume_path), strict=False)
+            self.model.load_state_dict(torch.load(resume_path, weights_only=False), strict=False)
         else:
             self.start_epoch = checkpoint['epoch'] + 1
             self.mnt_best = checkpoint['monitor_best']

@@ -158,9 +158,9 @@ class BaseTrainer:
         """
         resume_path = str(resume_path)
         self.logger.info("Loading checkpoint: {} ...".format(resume_path))
-        checkpoint = torch.load(resume_path)
+        checkpoint = torch.load(resume_path, weights_only=False)
         if not 'epoch' in checkpoint:
-            self.model.load_state_dict(torch.load(resume_path), strict=False)
+            self.model.load_state_dict(torch.load(resume_path, weights_only=False), strict=False)
         else:
             self.start_epoch = checkpoint['epoch'] + 1
             self.mnt_best = checkpoint['monitor_best']
