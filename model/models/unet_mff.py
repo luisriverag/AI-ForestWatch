@@ -80,14 +80,26 @@ class UNetMFF(BaseModel):
         self.mid_conv_256_256_b = nn.Conv2d(256, 256, 3, padding=1)
         self.mid_conv_512_1024 = nn.Conv2d(512, 1024, 3, padding=1)
         self.mid_conv_1024_1024 = nn.Conv2d(1024, 1024, 3, padding=1)
-        self.decoder_4 = UNet_up_block(prev_channel=self.encoder_4.output_channels,
+        # MFF blocks: fuse all encoder features at each decoder level's resolution
+        # Each MFFBlock receives features from all 4 encoder stages [64, 128, 256, 512]
+        # and outputs a fixed-width (64-channel) fused skip connection
+        enc_channels = [64, 128, 256, 512]
+        mff_out = 64  # match decoder_1 output / encoder_1 output channels
+        self.mff1 = MFFBlock(enc_channels, mff_out)
+        self.mff2 = MFFBlock(enc_channels, mff_out)
+        self.mff3 = MFFBlock(enc_channels, mff_out)
+        self.mff4 = MFFBlock(enc_channels, mff_out)
+
+        # prev_channel=mff_out (64) because MFF blocks output 64-channel fused skips
+        self.decoder_4 = UNet_up_block(prev_channel=mff_out,
                                        input_channel=self.mid_conv_1024_1024.out_channels, output_channel=256)
-        self.decoder_3 = UNet_up_block(prev_channel=self.encoder_3.output_channels,
+        self.decoder_3 = UNet_up_block(prev_channel=mff_out,
                                        input_channel=self.decoder_4.output_channels, output_channel=128)
-        self.decoder_2 = UNet_up_block(prev_channel=self.encoder_2.output_channels,
+        self.decoder_2 = UNet_up_block(prev_channel=mff_out,
                                        input_channel=self.decoder_3.output_channels, output_channel=64)
-        self.decoder_1 = UNet_up_block(prev_channel=self.encoder_1.output_channels,
+        self.decoder_1 = UNet_up_block(prev_channel=mff_out,
                                        input_channel=self.decoder_2.output_channels, output_channel=64)
+
         self.binary_last_conv = nn.Conv2d(64, num_classes, kernel_size=1)
         self.softmax = nn.Softmax(dim=1)
         self.forward = self.topologies[topology]
@@ -124,9 +136,9 @@ class UNetMFF(BaseModel):
         x_mid = self.activate(self.mid_conv_128_128_b(x_mid))
         x_mid = self.dropout(x_mid)
 
-        # MFF skips
-        mff1_out = self.mff1([x1_cat, x2_cat], target_size=x1_cat.shape[2:])
-        mff2_out = self.mff2([x1_cat, x2_cat], target_size=x2_cat.shape[2:])
+        # MFF skips (pad to 4 inputs to match MFFBlock's enc_channels [64,128,256,512])
+        mff1_out = self.mff1([x1_cat, x2_cat, x2_cat, x2_cat], target_size=x1_cat.shape[2:])
+        mff2_out = self.mff2([x1_cat, x2_cat, x2_cat, x2_cat], target_size=x2_cat.shape[2:])
 
         x = self.decoder_2(mff2_out, x_mid)
         x = self.decoder_1(mff1_out, x)
@@ -148,10 +160,10 @@ class UNetMFF(BaseModel):
         x_mid = self.activate(self.mid_conv_256_256_b(x_mid))
         x_mid = self.dropout(x_mid)
 
-        # MFF skips
-        mff1_out = self.mff1([x1_cat, x2_cat, x3_cat], target_size=x1_cat.shape[2:])
-        mff2_out = self.mff2([x1_cat, x2_cat, x3_cat], target_size=x2_cat.shape[2:])
-        mff3_out = self.mff3([x1_cat, x2_cat, x3_cat], target_size=x3_cat.shape[2:])
+        # MFF skips (pad to 4 inputs to match MFFBlock's enc_channels [64,128,256,512])
+        mff1_out = self.mff1([x1_cat, x2_cat, x3_cat, x3_cat], target_size=x1_cat.shape[2:])
+        mff2_out = self.mff2([x1_cat, x2_cat, x3_cat, x3_cat], target_size=x2_cat.shape[2:])
+        mff3_out = self.mff3([x1_cat, x2_cat, x3_cat, x3_cat], target_size=x3_cat.shape[2:])
 
         x = self.decoder_3(mff3_out, x_mid)
         x = self.decoder_2(mff2_out, x)

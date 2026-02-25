@@ -7,7 +7,7 @@ from torch.optim import *
 from torchvision import models
 
 class CustomSegformer(nn.Module):
-    def __init__(self, input_channels, num_classes, base_model = 'nvidia/mit-b0'):
+    def __init__(self, input_channels, num_classes, base_model = 'nvidia/mit-b3'):
         super().__init__()
         config = SegformerConfig.from_pretrained(base_model)
         config.num_labels = num_classes

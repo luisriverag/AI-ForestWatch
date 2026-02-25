@@ -125,10 +125,76 @@ def check_model(model_type="UNet",
 # Standalone testing
 # -----------------------------
 if __name__ == '__main__':
-    # Test: UNet3PlusSE
-    check_model(
-        model_type="UNet3PlusSE",
-        input_channels=7,
-        num_classes=2,
-        input_shape=[4, 7, 64, 64]
-    )
+
+    INPUT_CHANNELS = 7
+    NUM_CLASSES = 2
+    INPUT_SHAPE = [4, INPUT_CHANNELS, 64, 64]
+
+    def _count_params(model):
+        total = sum(p.numel() for p in model.parameters())
+        trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        return total, trainable
+
+    def _test_model(name, model):
+        print("\n" + "=" * 100)
+        print(f"  MODEL: {name}")
+        print("=" * 100)
+        # print(model)  # Commented out: full model summary
+        total, trainable = _count_params(model)
+        print(f"\n  Total parameters:     {total:,}")
+        print(f"  Trainable parameters: {trainable:,}")
+        print(f"  Non-trainable params: {total - trainable:,}")
+
+        model.eval()
+        in_tensor = torch.randn(*INPUT_SHAPE)
+        with torch.no_grad():
+            out_tensor, softmaxed = model(in_tensor)
+        print(f"  Input shape:  {list(in_tensor.shape)}")
+        print(f"  Output shape: {list(out_tensor.shape)}")
+        print("=" * 100 + "\n")
+
+    # ---------- 1. UNet ----------
+    _test_model("UNet", UNet(
+        input_channels=INPUT_CHANNELS,
+        num_classes=NUM_CLASSES,
+        topology="ENC_4_DEC_4"
+    ))
+
+    # ---------- 2. UNetSE (VGG backbone) ----------
+    _test_model("UNetSE", UNetSE(
+        input_channels=INPUT_CHANNELS,
+        num_classes=NUM_CLASSES,
+        topology="ENC_4_DEC_4"
+    ))
+
+    # ---------- 3. UNet3PlusSE ----------
+    _test_model("UNet3PlusSE", UNet3PlusSE(
+        input_channels=INPUT_CHANNELS,
+        num_classes=NUM_CLASSES
+    ))
+
+    # ---------- 4. UNetMFF ----------
+    _test_model("UNetMFF", UNetMFF(
+        input_channels=INPUT_CHANNELS,
+        num_classes=NUM_CLASSES,
+        topology="ENC_4_DEC_4"
+    ))
+
+    # ---------- 5. UNetSEResnet ----------
+    try:
+        _test_model("UNetSEResnet", UNetSEResnet(
+            input_channels=INPUT_CHANNELS,
+            num_classes=NUM_CLASSES
+        ))
+    except FileNotFoundError as e:
+        print(f"\n  [SKIPPED] UNetSEResnet — MoCo checkpoint not found: {e}\n")
+
+    # ---------- 6. CustomSegformer ----------
+    try:
+        _test_model("CustomSegformer", CustomSegformer(
+            input_channels=INPUT_CHANNELS,
+            num_classes=NUM_CLASSES,
+            base_model='nvidia/mit-b3'
+        ))
+    except Exception as e:
+        print(f"\n  [SKIPPED] CustomSegformer — {e}\n")
