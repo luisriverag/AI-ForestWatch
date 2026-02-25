@@ -19,12 +19,9 @@ from torchvision import models
 # Import model variants
 # -----------------------------
 from .models.unet import UNet as UNetModel
-from .models.unet_se import (
-    UNetSE as UNetSEModel,
-    UNetSE_resnet as UNetSEResnetModel,
-    UNet3PlusSE as UNet3PlusSEModel      # <-- ADDED HERE
-    
-)
+from .models.unet_se_vgg import UNetSE as UNetSEModel
+from .models.unet_se_resnet import UNetSE_resnet as UNetSEResnetModel
+from .models.unet3plus_se import UNet3PlusSE as UNet3PlusSEModel
 from .models.unet_mff import UNetMFF as UNetMFFModel
 from .models.segformer import CustomSegformer as CustomSegformerModel
 
