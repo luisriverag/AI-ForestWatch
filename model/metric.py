@@ -37,3 +37,23 @@ def accuracy(output, target):
         correct = 0
         correct += torch.sum(pred == target).item()
     return correct / (target.shape[1]*target.shape[2]*len(target)) 
+
+def compute_iou(pred, target, num_classes=2):
+    """Compute IoU for each class."""
+    ious = []
+    
+    for cls in range(num_classes):
+        pred_cls = (pred == cls)
+        target_cls = (target == cls)
+        
+        intersection = (pred_cls & target_cls).sum()
+        union = (pred_cls | target_cls).sum()
+        
+        if union == 0:
+            iou = 1.0 if intersection == 0 else 0.0
+        else:
+            iou = intersection / union
+        
+        ious.append(iou)
+    
+    return ious
