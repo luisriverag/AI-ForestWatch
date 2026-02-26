@@ -32,7 +32,7 @@ def main(config, args):
         logger.info('Loading checkpoint: {} ...'.format(
             config['trainer']['pretrained_model']))
         resume_path = config['trainer']['pretrained_model']
-    checkpoint = torch.load(resume_path)
+    checkpoint = torch.load(resume_path, weights_only=False)
     model.load_state_dict(checkpoint, strict=False)
 
     if config['n_gpu'] > 1:

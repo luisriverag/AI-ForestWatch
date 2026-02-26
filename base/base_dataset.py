@@ -9,7 +9,10 @@ import pickle
 import shutil
 
 import numpy as np
-from osgeo import gdal
+try:
+    from osgeo import gdal
+except ImportError:
+    gdal = None  # GDAL only needed for BaseInferenceDataset
 from torch.utils.data import Dataset
 
 from base.datagen import *

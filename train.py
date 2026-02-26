@@ -32,6 +32,11 @@ def main(config):
     val_data_loader = config.init_obj('train_data_loader', module_data, mode='val')
     test_data_loader = config.init_obj('train_data_loader', module_data, mode='test')
 
+    # print data shapes
+    print(f"Train data shape: {train_data_loader.dataset[0][0].shape}")
+    print(f"Val data shape: {val_data_loader.dataset[0][0].shape}")
+    print(f"Test data shape: {test_data_loader.dataset[0][0].shape}")
+
     # build model architecture, then print to console
     model = config.init_obj('arch', module_arch)
     logger.info(model)

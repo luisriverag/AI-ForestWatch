@@ -1,0 +1,226 @@
+[
+  {
+    "trial_id": "trial_001",
+    "hyperparams": {
+      "se_reduction": 1,
+      "se_flags": {
+        "input": true,
+        "encoder": true,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_002",
+    "hyperparams": {
+      "se_reduction": 1,
+      "se_flags": {
+        "input": false,
+        "encoder": true,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_003",
+    "hyperparams": {
+      "se_reduction": 1,
+      "se_flags": {
+        "input": true,
+        "encoder": false,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_004",
+    "hyperparams": {
+      "se_reduction": 1,
+      "se_flags": {
+        "input": true,
+        "encoder": true,
+        "decoder": false,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_005",
+    "hyperparams": {
+      "se_reduction": 4,
+      "se_flags": {
+        "input": true,
+        "encoder": true,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_006",
+    "hyperparams": {
+      "se_reduction": 4,
+      "se_flags": {
+        "input": false,
+        "encoder": true,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_007",
+    "hyperparams": {
+      "se_reduction": 4,
+      "se_flags": {
+        "input": true,
+        "encoder": false,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_008",
+    "hyperparams": {
+      "se_reduction": 4,
+      "se_flags": {
+        "input": true,
+        "encoder": true,
+        "decoder": false,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_009",
+    "hyperparams": {
+      "se_reduction": 8,
+      "se_flags": {
+        "input": true,
+        "encoder": true,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_010",
+    "hyperparams": {
+      "se_reduction": 8,
+      "se_flags": {
+        "input": false,
+        "encoder": true,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_011",
+    "hyperparams": {
+      "se_reduction": 8,
+      "se_flags": {
+        "input": true,
+        "encoder": false,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_012",
+    "hyperparams": {
+      "se_reduction": 8,
+      "se_flags": {
+        "input": true,
+        "encoder": true,
+        "decoder": false,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_013",
+    "hyperparams": {
+      "se_reduction": 16,
+      "se_flags": {
+        "input": true,
+        "encoder": true,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_014",
+    "hyperparams": {
+      "se_reduction": 16,
+      "se_flags": {
+        "input": false,
+        "encoder": true,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_015",
+    "hyperparams": {
+      "se_reduction": 16,
+      "se_flags": {
+        "input": true,
+        "encoder": false,
+        "decoder": true,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  },
+  {
+    "trial_id": "trial_016",
+    "hyperparams": {
+      "se_reduction": 16,
+      "se_flags": {
+        "input": true,
+        "encoder": true,
+        "decoder": false,
+        "bottleneck": false
+      }
+    },
+    "status": "failed",
+    "error": "'Trainer' object has no attribute 'models_dir'"
+  }
+]

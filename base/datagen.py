@@ -9,7 +9,10 @@ import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
-from osgeo import gdal
+try:
+    from osgeo import gdal
+except ImportError:
+    gdal = None  # GDAL only needed for data generation functions
 from PIL import Image
 
 
